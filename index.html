@@ -101,7 +101,7 @@ select{border:1px solid #ddd;border-radius:6px;padding:4px 5px;font-size:11px;ba
 <div id="app">
 <div class="header">
 <div><div class="header-title">San Miguel Contadores</div><div class="header-sub" id="header-sub"></div></div>
-<div class="header-right"><span class="role-badge" id="role-badge"></span><button class="yr-btn" id="yr-btn" onclick="openYrCfg()"></button><div style="font-size:11px;opacity:.8" id="header-date"></div></div>
+<div class="header-right"><span class="role-badge" id="role-badge"></span><button class="yr-btn" id="exp-btn" onclick="exportHtml()" style="display:none">⬇ Exportar HTML</button><button class="yr-btn" id="yr-btn" onclick="openYrCfg()"></button><div style="font-size:11px;opacity:.8" id="header-date"></div></div>
 </div>
 <div class="nav" id="nav"></div>
 <div class="content" id="main-content"></div>
@@ -205,6 +205,7 @@ function render(){
   const yb=document.getElementById("yr-btn");
   yb.textContent="Años: "+S.years.cur+" ("+S.years.hist.join(", ")+")";
   yb.style.display=isAdmin?"inline-block":"none";
+  document.getElementById("exp-btn").style.display=isAdmin?"inline-block":"none";
   const rb=document.getElementById("role-badge");
   rb.textContent=isAdmin?"ADMINISTRADOR":"SOLO LECTURA";
   rb.className="role-badge "+(isAdmin?"role-admin":"role-read");
@@ -245,6 +246,30 @@ function cToggleNC(cid,ok,toNC){if(!isAdmin)return;confirmAndRun(toNC?"¿Marcar 
 function addClient(){if(!isAdmin)return;const n=document.getElementById("add-n").value;if(!n)return;if(!confirm("¿Agregar cliente "+n+"?"))return;const c={id:Math.max(...S.clients.map(x=>x.id),0)+1,n,a:document.getElementById("add-a").value,c:parseInt(document.getElementById("add-c").value)||0,m:parseInt(document.getElementById("add-m").value)||12,ib:document.getElementById("add-ib").value,o:nO(S.years.hist)};S.clients.push(c);persist();closeModal();render()}
 function delClient(id){if(!isAdmin)return;const c=S.clients.find(x=>x.id===id);if(!confirm("¿Eliminar a "+c.n+"? No se puede deshacer."))return;S.clients=S.clients.filter(x=>x.id!==id);if(S.selId===id){S.selId=null;S.view="clientes"}persist();closeModal();render()}
 function saveYears(){if(!isAdmin)return;if(!confirm("¿Guardar configuración de años?"))return;S.years.cur=parseInt(document.getElementById("yr-cur").value)||2025;S.years.hist=[0,1,2,3].map(i=>parseInt(document.getElementById("yr-h"+i).value)||2020);persist();closeModal();render()}
+async function exportHtml(){
+  if(!isAdmin)return;
+  if(!confirm("¿Exportar HTML con los datos actuales?\n\nSe descargará un archivo index.html que deberás subir a GitHub para que el resto del equipo vea los cambios."))return;
+  try{
+    const resp=await fetch(window.location.href);
+    if(!resp.ok)throw new Error("HTTP "+resp.status);
+    let html=await resp.text();
+    const newData=JSON.stringify(S.clients);
+    const dataRegex=/const INIT_DATA=\[[\s\S]*?\n\];/;
+    if(!dataRegex.test(html))throw new Error("No se encontró INIT_DATA en el HTML fuente");
+    html=html.replace(dataRegex,"const INIT_DATA="+newData+";");
+    const yearsRegex=/years:\{cur:\d+,hist:\[[^\]]+\]\}/;
+    if(!yearsRegex.test(html))throw new Error("No se encontró configuración de años en el HTML fuente");
+    html=html.replace(yearsRegex,"years:"+JSON.stringify(S.years));
+    const blob=new Blob([html],{type:"text/html;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download="index.html";document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setTimeout(()=>alert("Archivo descargado.\n\nPróximos pasos:\n1. Ir a github.com/Maximendi/VENCIMIENTOS-ANUALES\n2. Click en index.html\n3. Click en el lápiz (editar)\n4. Borrar todo el contenido y pegar el nuevo\n5. Commit changes\n6. Esperar 2 minutos"),100);
+  }catch(e){
+    alert("Error al exportar: "+e.message+"\n\nNota: esta función solo funciona desde el sitio publicado en GitHub Pages, no abriendo el archivo localmente.");
+  }
+}
 function cUpdCl(cid,f,v,lbl){if(!isAdmin)return;confirmAndRun("¿Cambiar "+lbl+"?",()=>updC(cid,f,v))}
 /* ─── Modals ─── */
 function openAddModal(){if(!isAdmin)return;openModal('<h3 style="color:#185FA5">Agregar Cliente</h3><div class="form-row"><div class="form-group" style="flex:1 1 100%"><label>Razón Social</label><input type="text" id="add-n" style="width:100%"></div></div><div class="form-row"><div class="form-group" style="flex:1 1 150px"><label>Analista</label><select id="add-a" style="width:100%">'+ANALYSTS.map(a=>'<option>'+a+'</option>').join('')+'</select></div><div class="form-group" style="flex:0 0 70px"><label>CUIT</label><input type="number" id="add-c" value="0" min="0" max="9" style="width:100%"></div><div class="form-group" style="flex:0 0 70px"><label>Cierre</label><input type="number" id="add-m" value="12" min="1" max="12" style="width:100%"></div><div class="form-group" style="flex:1 1 120px"><label>IIBB</label><select id="add-ib" style="width:100%">'+IBOPS.map(o=>'<option>'+o+'</option>').join('')+'</select></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="btn-s" onclick="closeModal()">Cancelar</button><button class="btn" onclick="addClient()">Agregar</button></div>')}
