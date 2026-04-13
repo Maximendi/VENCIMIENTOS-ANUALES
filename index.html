@@ -144,7 +144,7 @@ select:focus{border-color:var(--blue)}
 <div id="app">
 <div class="header">
 <div class="header-brand"><div class="header-icon">📋</div><div><div class="header-title">San Miguel Contadores</div><div class="header-sub" id="header-sub"></div></div></div>
-<div class="header-right"><span class="role-badge" id="role-badge"></span><button class="yr-btn" id="exp-btn" onclick="exportHtml()" style="display:none">⬇ Exportar HTML</button><button class="yr-btn" id="yr-btn" onclick="openYrCfg()"></button><div style="font-size:11px;opacity:.75;font-weight:500" id="header-date"></div></div>
+<div class="header-right"><span class="role-badge" id="role-badge"></span><button class="yr-btn" id="exp-btn" onclick="exportHtml()" style="display:none">⬇ Exportar HTML</button><button class="yr-btn" id="yr-btn" onclick="openYrCfg()"></button><button class="yr-btn" onclick="resetToLatest()" title="Borrar datos locales y cargar la versión publicada en GitHub">🔄 Actualizar datos</button><div style="font-size:11px;opacity:.75;font-weight:500" id="header-date"></div></div>
 </div>
 <div class="nav" id="nav"></div>
 <div class="content" id="main-content"></div>
@@ -341,6 +341,11 @@ function vWf(){return '<h2 class="stitle">Workflow DJ Ganancias</h2><div style="
 
 function vAn(){return '<h2 class="stitle">Vista por Analista</h2>'+ANALYSTS.map(a=>{const cs=S.clients.filter(c=>c.a===a);const ad=cs.reduce((ac,c)=>ac+OBLS.filter(k=>c.o[k]?.cs==="ADEUDADA").length,0);const pr=cs.reduce((ac,c)=>ac+OBLS.filter(k=>c.o[k]?.cs==="PRESENTADA").length,0);const pd=cs.reduce((ac,c)=>ac+OBLS.filter(k=>!c.o[k]?.cs).length,0);return'<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="margin:0;font-size:14px;color:#185FA5">'+a+'</h4><span style="font-size:12px;color:#555">'+cs.length+' clientes</span></div><div style="display:flex;gap:10px;margin-bottom:10px"><span style="font-size:12px"><b style="color:#155724">'+pr+'</b> pres.</span><span style="font-size:12px"><b style="color:#721c24">'+ad+'</b> adeud.</span><span style="font-size:12px"><b style="color:#854F0B">'+pd+'</b> s/dato</span></div><div style="overflow-x:auto"><table><thead><tr><th style="font-size:10px">Cliente</th>'+OBLS.map(k=>'<th style="font-size:9px;text-align:center">'+OLBL[k].split(" ")[0]+'</th>').join("")+'</tr></thead><tbody>'+cs.map(c=>'<tr class="clickable" onclick="goDetail('+c.id+')"><td style="font-size:11px;font-weight:600">'+c.n+'</td>'+OBLS.map(k=>'<td style="text-align:center">'+badge(c.o[k]?.cs)+'</td>').join("")+'</tr>').join("")+'</tbody></table></div></div>'}).join("")}
 
+function resetToLatest(){
+  if(!confirm("¿Actualizar a la versión más reciente?\n\nSe borrarán los datos locales de este navegador y se cargarán los datos publicados en GitHub.\n\nCualquier cambio no exportado se perderá."))return;
+  localStorage.removeItem("smca_v2");
+  location.reload();
+}
 function init(){load();render()}
 </script>
 </body>
