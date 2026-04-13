@@ -263,13 +263,26 @@ async function exportHtml(){
     const resp=await fetch(window.location.href);
     if(!resp.ok)throw new Error("HTTP "+resp.status);
     let html=await resp.text();
-    const newData=JSON.stringify(S.clients);
-    const dataRegex=/const INIT_DATA=\[[\s\S]*?\];/;
-    if(!dataRegex.test(html))throw new Error("No se encontró INIT_DATA en el HTML fuente");
-    html=html.replace(dataRegex,"const INIT_DATA="+newData+";");
-    const yearsRegex=/years:\{cur:\d+,hist:\[[^\]]+\]\}/;
-    if(!yearsRegex.test(html))throw new Error("No se encontró configuración de años en el HTML fuente");
-    html=html.replace(yearsRegex,"years:"+JSON.stringify(S.years));
+    // Reemplazar INIT_DATA usando marcadores de texto fijos
+    const startMarker="const INIT_DATA=";
+    const startIdx=html.indexOf(startMarker);
+    if(startIdx===-1)throw new Error("No se encontró INIT_DATA en el HTML fuente");
+    // Encontrar el cierre: buscar "];" desde el inicio del array
+    const arrayStart=startIdx+startMarker.length;
+    let depth=0,endIdx=-1;
+    for(let i=arrayStart;i<html.length;i++){
+      if(html[i]==="[")depth++;
+      else if(html[i]==="]"){depth--;if(depth===0){endIdx=i;break;}}
+    }
+    if(endIdx===-1)throw new Error("No se pudo encontrar el cierre de INIT_DATA");
+    html=html.slice(0,startIdx)+startMarker+JSON.stringify(S.clients)+";"+html.slice(endIdx+2);
+    // Reemplazar years
+    const yearsMarker="years:";
+    const yi=html.indexOf(yearsMarker+"{cur:");
+    if(yi!==-1){
+      const ye=html.indexOf("}",html.indexOf("]",yi))+1;
+      html=html.slice(0,yi)+yearsMarker+JSON.stringify(S.years)+html.slice(ye);
+    }
     const blob=new Blob([html],{type:"text/html;charset=utf-8"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
