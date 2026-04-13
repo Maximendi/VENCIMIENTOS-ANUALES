@@ -264,7 +264,7 @@ async function exportHtml(){
     if(!resp.ok)throw new Error("HTTP "+resp.status);
     let html=await resp.text();
     const newData=JSON.stringify(S.clients);
-    const dataRegex=/const INIT_DATA=\[[\s\S]*?\n\];/;
+    const dataRegex=/const INIT_DATA=\[[\s\S]*?\];/;
     if(!dataRegex.test(html))throw new Error("No se encontró INIT_DATA en el HTML fuente");
     html=html.replace(dataRegex,"const INIT_DATA="+newData+";");
     const yearsRegex=/years:\{cur:\d+,hist:\[[^\]]+\]\}/;
