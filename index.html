@@ -146,6 +146,8 @@ select:focus{border-color:var(--blue)}
 .scroll-h{overflow-x:hidden;overflow-y:auto;max-height:72vh;border:1px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--surface);width:100%}
 .scroll-h table{margin:0;width:100%;table-layout:fixed}
 .scroll-h th{position:sticky!important;top:0!important;z-index:10!important;background:var(--gray-light)!important;box-shadow:0 1px 0 var(--gray-border)}
+.scroll-obl{overflow:auto;max-height:72vh;border:1px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--surface);width:100%}
+.scroll-obl th{position:sticky!important;top:0!important;z-index:10!important;background:var(--gray-light)!important;box-shadow:0 1px 0 var(--gray-border)}
 @media(max-width:768px){.content{padding:14px 12px}.header{padding:0 16px;flex-wrap:wrap;height:auto;padding-top:10px;padding-bottom:10px}.kpi{flex:1 1 100px;padding:10px 12px}.kpi-num{font-size:24px}th{position:static}}
 @media print{#login-screen,.nav,.header,.filter-bar,.btn,.btn-s,.btn-d,.obl-tabs,.back-btn,.readonly-msg{display:none!important}#app{display:block!important}.content{padding:0}th{position:static}}
 </style>
@@ -269,13 +271,13 @@ function updO(cid,ok,f,v){const c=S.clients.find(x=>x.id===cid);if(c){c.o[ok][f]
 function updH(cid,ok,yr,v){const c=S.clients.find(x=>x.id===cid);if(c){if(!c.o[ok].y)c.o[ok].y={};c.o[ok].y[yr]=v;persist();const sy=window.scrollY;render();requestAnimationFrame(()=>window.scrollTo(0,sy))}}
 function updWf(cid,i,v){const c=S.clients.find(x=>x.id===cid);if(c){c.o.ganancias.wf[i]=v;persist();render()}}
 function updWfDate(cid,i,v){const c=S.clients.find(x=>x.id===cid);if(c){if(!Array.isArray(c.o.ganancias.wfDates))c.o.ganancias.wfDates=["","","","","","","","",""];c.o.ganancias.wfDates[i]=v;persist();render()}}
-function cUpdWfDate(cid,i,v,lbl){if(!isAdmin)return;if(S.view==="detail"){updWfDate(cid,i,v);pendingChanges=true}else{confirmAndRun("¿Guardar fecha "+lbl+"?",()=>updWfDate(cid,i,v))}}
+function cUpdWfDate(cid,i,v,lbl){if(!isAdmin)return;if(S.view==="detail"){updWfDate(cid,i,v);pendingChanges=true}else if(S.view==="workflow"){updWfDate(cid,i,v)}else{confirmAndRun("¿Guardar fecha "+lbl+"?",()=>updWfDate(cid,i,v))}}
 function handleWfDateBlur(el,cid,i,lbl){const v=el.value;if(!v){cUpdWfDate(cid,i,"",lbl);return}const iso=displayToDate(v);if(iso){cUpdWfDate(cid,i,iso,lbl)}else{alert("Formato inválido. Usar DD/MM/AAAA.");const c=S.clients.find(x=>x.id===cid);el.value=dateToDisplay(c?.o?.ganancias?.wfDates?.[i]||"")}}
 function updC(cid,f,v){const c=S.clients.find(x=>x.id===cid);if(c){c[f]=v;persist();render()}}
 /* Wrappers with confirmation */
 function cUpdO(cid,ok,f,v,lbl){if(!isAdmin)return;if(S.view==="detail"){updO(cid,ok,f,v);pendingChanges=true}else if(S.view==="obligacion"){updO(cid,ok,f,v)}else{confirmAndRun("¿Cambiar "+lbl+" a "+(v||"No vencido")+"?",()=>updO(cid,ok,f,v))}}
 function cUpdH(cid,ok,yr,v){if(!isAdmin)return;if(S.view==="detail"){updH(cid,ok,yr,v);pendingChanges=true}else if(S.view==="obligacion"){updH(cid,ok,yr,v)}else{confirmAndRun("¿Cambiar estado "+yr+" a "+(v||"No vencido")+"?",()=>updH(cid,ok,yr,v))}}
-function cUpdWf(cid,i,v){if(!isAdmin)return;if(S.view==="detail"){updWf(cid,i,v);pendingChanges=true}else{confirmAndRun("¿Cambiar paso "+(i+1)+" a "+(v||"Pendiente")+"?",()=>updWf(cid,i,v))}}
+function cUpdWf(cid,i,v){if(!isAdmin)return;if(S.view==="detail"){updWf(cid,i,v);pendingChanges=true}else if(S.view==="workflow"){updWf(cid,i,v)}else{confirmAndRun("¿Cambiar paso "+(i+1)+" a "+(v||"Pendiente")+"?",()=>updWf(cid,i,v))}}
 function cUpdNote(cid,ok,el){if(!isAdmin)return;if(S.view==="detail"){updO(cid,ok,"nt",el.value);pendingChanges=true}else{confirmAndRun("¿Guardar nota?",()=>updO(cid,ok,"nt",el.value))}}
 function cToggleNC(cid,ok,toNC){if(!isAdmin)return;if(S.view==="detail"){updO(cid,ok,"d",toNC?"N/C":"");pendingChanges=true}else{confirmAndRun(toNC?"¿Marcar como N/C?":"¿Habilitar fecha?",()=>updO(cid,ok,"d",toNC?"N/C":""))}}
 
@@ -365,7 +367,7 @@ return '<div style="display:flex;justify-content:space-between;align-items:flex-
 '<div class="filter-bar"><input type="text" placeholder="Buscar cliente..." value="'+sq+'" oninput="S.oblSearch=this.value;render()">'+
 (sq?'<button class="btn-s" onclick="S.oblSearch=\'\';render()">Limpiar</button>':'')+
 '<div class="ml-auto" style="display:flex;gap:8px"><button class="btn-s" onclick="exportOblPDF()" title="Exportar esta vista a PDF">⬇ PDF</button><button class="btn-s" onclick="exportOblXLSX()" title="Exportar esta vista a Excel">⬇ Excel</button></div></div>'+
-'<div style="overflow-x:auto"><table><thead><tr>'+
+'<div class="scroll-obl"><table><thead><tr>'+
 '<th style="min-width:170px">Cliente</th>'+
 '<th style="text-align:center">Analista</th>'+
 '<th style="text-align:center">Vto.</th>'+
