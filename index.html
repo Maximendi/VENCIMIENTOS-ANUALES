@@ -233,6 +233,10 @@ function persist(){try{localStorage.setItem("smca_v2",JSON.stringify({clients:S.
 
 /* ─── Render ─── */
 function render(){
+  /* preserve scroll positions before rebuilding DOM */
+  const sy=window.scrollY;
+  const sc={};
+  ['.scroll-obl','.scroll-h','.scroll-tbl'].forEach(s=>{const e=document.querySelector(s);if(e)sc[s]={t:e.scrollTop,l:e.scrollLeft};});
   document.getElementById("header-sub").textContent="Control Anuales Sociedades "+S.years.cur;
   document.getElementById("header-date").textContent="Hoy: "+fmtD(TODAY);
   const yb=document.getElementById("yr-btn");
@@ -252,6 +256,11 @@ function render(){
   else if(S.view==="vencimientos")m.innerHTML=rdMsg+vVto();
   else if(S.view==="workflow")m.innerHTML=rdMsg+vWf();
   else if(S.view==="analistas")m.innerHTML=rdMsg+vAn();
+  /* restore scroll positions after DOM rebuild */
+  requestAnimationFrame(()=>{
+    window.scrollTo(0,sy);
+    ['.scroll-obl','.scroll-h','.scroll-tbl'].forEach(s=>{if(sc[s]){const e=document.querySelector(s);if(e){e.scrollTop=sc[s].t;e.scrollLeft=sc[s].l;}}});
+  });
 }
 function renderNav(){const tabs=[["dashboard","Dashboard"],["clientes","Clientes"],["obligacion","Obligación"],["vencimientos","Vencimientos"],["workflow","Workflow"],["analistas","Analistas"]];document.getElementById("nav").innerHTML=tabs.map(([k,l])=>'<button class="'+(S.view===k||(S.view==="detail"&&k==="clientes")?"active":"")+'" onclick="go(\''+k+'\')">'+l+'</button>').join("")}
 function go(v){if(S.view==="detail"&&pendingChanges&&!confirm("Hay cambios pendientes. ¿Confirmar y salir?"))return;pendingChanges=false;S.view=v;render()}
@@ -269,8 +278,8 @@ function isAnyAdeudada(c){return OBLS.some(k=>c.o[k]?.cs==="ADEUDADA")}
 function getFiltered(){return S.clients.filter(c=>{if(S.search&&!c.n.toLowerCase().includes(S.search.toLowerCase()))return false;if(S.filtA&&c.a!==S.filtA)return false;if(S.filtS&&!OBLS.some(k=>c.o[k]?.cs===S.filtS))return false;return true})}
 
 /* ─── Mutation with confirm ─── */
-function updO(cid,ok,f,v){const c=S.clients.find(x=>x.id===cid);if(c){c.o[ok][f]=v;persist();const sy=window.scrollY;render();requestAnimationFrame(()=>window.scrollTo(0,sy))}}
-function updH(cid,ok,yr,v){const c=S.clients.find(x=>x.id===cid);if(c){if(!c.o[ok].y)c.o[ok].y={};c.o[ok].y[yr]=v;persist();const sy=window.scrollY;render();requestAnimationFrame(()=>window.scrollTo(0,sy))}}
+function updO(cid,ok,f,v){const c=S.clients.find(x=>x.id===cid);if(c){c.o[ok][f]=v;persist();render()}}
+function updH(cid,ok,yr,v){const c=S.clients.find(x=>x.id===cid);if(c){if(!c.o[ok].y)c.o[ok].y={};c.o[ok].y[yr]=v;persist();render()}}
 function updWf(cid,i,v){const c=S.clients.find(x=>x.id===cid);if(c){c.o.ganancias.wf[i]=v;persist();render()}}
 function updWfDate(cid,i,v){const c=S.clients.find(x=>x.id===cid);if(c){if(!Array.isArray(c.o.ganancias.wfDates))c.o.ganancias.wfDates=["","","","","","","","",""];c.o.ganancias.wfDates[i]=v;persist();render()}}
 function cUpdWfDate(cid,i,v,lbl){if(!isAdmin)return;if(S.view==="detail"){updWfDate(cid,i,v);pendingChanges=true}else if(S.view==="workflow"){updWfDate(cid,i,v)}else{confirmAndRun("¿Guardar fecha "+lbl+"?",()=>updWfDate(cid,i,v))}}
