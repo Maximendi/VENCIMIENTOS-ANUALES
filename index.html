@@ -229,7 +229,7 @@ const INIT_DATA=[{"id":1,"n":"AC SERVICIOS SAU","a":"YANINA ALARCON","c":8,"m":1
 /* ─── State ─── */
 let S={clients:null,years:{"cur":2025,"hist":[2024,2023,2022,2021]},view:"dashboard",selId:null,filtA:"",filtS:"",search:"",oblF:"ganancias",oblSearch:"",dashFilt:"",dashObl:""};
 function load(){try{const d=JSON.parse(localStorage.getItem("smca_v2"));if(d){S.clients=d.clients;S.years=d.years||S.years}}catch(e){}if(!S.clients)S.clients=JSON.parse(JSON.stringify(INIT_DATA));migrateWfDates()}
-function migrateWfDates(){S.clients.forEach(c=>{if(c.o&&c.o.ganancias){if(!Array.isArray(c.o.ganancias.wfDates))c.o.ganancias.wfDates=["","","","","","","","",""];while(c.o.ganancias.wfDates.length<9)c.o.ganancias.wfDates.push("");if(!Array.isArray(c.o.ganancias.wf))c.o.ganancias.wf=["","","","","","","","",""];while(c.o.ganancias.wf.length<9)c.o.ganancias.wf.push("")}if(!c.gd)c.gd={envDJ:"",anticipos:"",montoAnticipo:"",saldoFavor:"",montoSAF:"",quebrantos:""};else if(c.gd.quebrantos===undefined)c.gd.quebrantos=""})}
+function migrateWfDates(){S.clients.forEach(c=>{if(c.o&&c.o.ganancias){if(!Array.isArray(c.o.ganancias.wfDates))c.o.ganancias.wfDates=["","","","","","","","",""];while(c.o.ganancias.wfDates.length<9)c.o.ganancias.wfDates.push("");if(!Array.isArray(c.o.ganancias.wf))c.o.ganancias.wf=["","","","","","","","",""];while(c.o.ganancias.wf.length<9)c.o.ganancias.wf.push("")}if(!c.gd)c.gd={envDJ:"",anticipos:"",montoAnticipo:"",saldoFavor:"",montoSAF:"",quebranto:"",quebrantos:""};else{if(c.gd.quebrantos===undefined)c.gd.quebrantos="";if(c.gd.quebranto===undefined)c.gd.quebranto=""}})}
 function persist(){try{localStorage.setItem("smca_v2",JSON.stringify({clients:S.clients,years:S.years}))}catch(e){}}
 
 /* ─── Render ─── */
@@ -441,6 +441,7 @@ return '<div style="display:flex;justify-content:space-between;align-items:flex-
 '<th style="text-align:center;min-width:110px">Monto Anticipos</th>'+
 '<th style="text-align:center;min-width:90px">Saldo a Favor</th>'+
 '<th style="text-align:center;min-width:110px">Monto SAF</th>'+
+'<th style="text-align:center;min-width:80px">Quebranto</th>'+
 '<th style="text-align:center;min-width:120px">Quebrantos acum.</th>'+
 '</tr></thead><tbody>'+
 S.clients.map(c=>{const gd=c.gd||{};const gs=c.o?.ganancias?.cs||"";return'<tr>'+
@@ -453,6 +454,7 @@ S.clients.map(c=>{const gd=c.gd||{};const gs=c.o?.ganancias?.cs||"";return'<tr>'
 '<td style="text-align:center;padding:3px 6px">'+montoInput(gd.montoAnticipo||"",c.id,"montoAnticipo")+'</td>'+
 '<td style="text-align:center">'+sinoDiv(gd.saldoFavor||"",c.id,"saldoFavor")+'</td>'+
 '<td style="text-align:center;padding:3px 6px">'+montoInput(gd.montoSAF||"",c.id,"montoSAF")+'</td>'+
+'<td style="text-align:center">'+sinoDiv(gd.quebranto||"",c.id,"quebranto")+'</td>'+
 '<td style="text-align:center;padding:3px 6px">'+montoInput(gd.quebrantos||"",c.id,"quebrantos")+'</td>'+
 '</tr>';}).join("")+
 '</tbody></table></div>';}
@@ -633,18 +635,44 @@ function exportDetGPDF(){
   doc.text("San Miguel Contadores — Detalle Ganancias ("+yr+")",40,36);
   doc.setFontSize(8);doc.setTextColor(120,120,120);
   doc.text("Generado: "+fmtD(TODAY),40,50);
-  const head=[["Cliente","Cierre","Analista","Ganancias","Envío DJ","Anticipos","Monto Anticipos","Saldo a Favor","Monto SAF","Quebrantos acum."]];
+  const head=[["Cliente","Cierre","Analista","Ganancias","Envío DJ","Anticipos","Monto Anticipos","Saldo a Favor","Monto SAF","Quebranto","Quebrantos acum."]];
   const body=S.clients.map(c=>{
     const gd=c.gd||{};const gs=c.o?.ganancias?.cs||"";const an=c.a?c.a.split(" ")[0]:"—";
-    return[c.n,c.m,an,gs||"—",gd.envDJ||"—",gd.anticipos||"—",gd.montoAnticipo?fmtMonto(gd.montoAnticipo):"—",gd.saldoFavor||"—",gd.montoSAF?fmtMonto(gd.montoSAF):"—",gd.quebrantos?fmtMonto(gd.quebrantos):"—"];
+    return[c.n,c.m,an,gs||"",gd.envDJ||"",gd.anticipos||"",gd.montoAnticipo?fmtMonto(gd.montoAnticipo):"—",gd.saldoFavor||"",gd.montoSAF?fmtMonto(gd.montoSAF):"—",gd.quebranto||"",gd.quebrantos?fmtMonto(gd.quebrantos):"—"];
   });
-  const stColor=v=>v==="PRESENTADA"||v==="SI"?[22,128,60]:v==="ADEUDADA"||v==="NO"?[185,28,28]:v==="N/C"?[109,40,217]:[150,150,150];
+  const ICON_COLS=[3,4,5,7,9];
+  const drawIcon=function(v,cx,cy){
+    if(v==="PRESENTADA"||v==="SI"){
+      doc.setFillColor(22,128,60);doc.circle(cx,cy,5,"F");
+      doc.setDrawColor(255,255,255);doc.setLineWidth(1.3);
+      doc.line(cx-2.5,cy+0.3,cx-0.6,cy+2.5);doc.line(cx-0.6,cy+2.5,cx+3,cy-2);
+    } else if(v==="ADEUDADA"){
+      doc.setFillColor(248,215,218);doc.roundedRect(cx-8,cy-6,16,12,2,2,"F");
+      doc.setTextColor(185,28,28);doc.setFontSize(11);doc.setFont("helvetica","bold");
+      doc.text("!",cx,cy+4,{align:"center"});
+    } else if(v==="NO"){
+      doc.setDrawColor(185,28,28);doc.setLineWidth(1.6);
+      doc.line(cx-3.5,cy-3.5,cx+3.5,cy+3.5);doc.line(cx+3.5,cy-3.5,cx-3.5,cy+3.5);
+    } else if(v==="N/C"){
+      doc.setDrawColor(109,40,217);doc.setLineWidth(1.3);doc.circle(cx,cy,5,"S");
+      doc.line(cx+3.5,cy-3.5,cx-3.5,cy+3.5);
+    } else {
+      doc.setDrawColor(156,163,175);doc.setLineWidth(1);doc.line(cx-5,cy,cx+5,cy);
+    }
+    doc.setFont("helvetica","normal");doc.setLineWidth(0.2);
+  };
   doc.autoTable({
     head,body,startY:62,
     styles:{fontSize:7.5,cellPadding:4,font:"helvetica",overflow:"ellipsize"},
-    headStyles:{fillColor:[26,95,173],textColor:[255,255,255],fontStyle:"bold"},
-    columnStyles:{0:{cellWidth:110},1:{cellWidth:30,halign:"center"},2:{cellWidth:44,halign:"center"},3:{cellWidth:60,halign:"center"},4:{cellWidth:44,halign:"center"},5:{cellWidth:44,halign:"center"},6:{cellWidth:72,halign:"right"},7:{cellWidth:50,halign:"center"},8:{cellWidth:72,halign:"right"},9:{cellWidth:80,halign:"right"}},
-    didParseCell:function(data){if(data.section==="body"&&[3,4,5,7].includes(data.column.index)){data.cell.styles.textColor=stColor(data.cell.raw);data.cell.styles.fontStyle="bold";}},
+    headStyles:{fillColor:[26,95,173],textColor:[255,255,255],fontStyle:"bold",fontSize:7},
+    columnStyles:{0:{cellWidth:130},1:{cellWidth:26,halign:"center"},2:{cellWidth:46,halign:"center"},3:{cellWidth:46,halign:"center"},4:{cellWidth:40,halign:"center"},5:{cellWidth:40,halign:"center"},6:{cellWidth:72,halign:"right"},7:{cellWidth:46,halign:"center"},8:{cellWidth:72,halign:"right"},9:{cellWidth:40,halign:"center"},10:{cellWidth:76,halign:"right"}},
+    didParseCell:function(data){
+      if(data.section==="body"&&ICON_COLS.includes(data.column.index))data.cell.text=[""];
+    },
+    didDrawCell:function(data){
+      if(data.section!=="body"||!ICON_COLS.includes(data.column.index))return;
+      drawIcon(data.cell.raw,data.cell.x+data.cell.width/2,data.cell.y+data.cell.height/2);
+    },
     alternateRowStyles:{fillColor:[246,248,252]},
     margin:{left:40,right:40}
   });
@@ -655,13 +683,13 @@ function exportDetGPDF(){
 function exportDetGXLSX(){
   const yr=S.years.cur;
   const wb=XLSX.utils.book_new();
-  const header=["Cliente","Cierre","Analista","Ganancias","Envío DJ","Anticipos","Monto Anticipos","Saldo a Favor","Monto SAF","Quebrantos acum."];
+  const header=["Cliente","Cierre","Analista","Ganancias","Envío DJ","Anticipos","Monto Anticipos","Saldo a Favor","Monto SAF","Quebranto","Quebrantos acum."];
   const rows=S.clients.map(c=>{
     const gd=c.gd||{};const gs=c.o?.ganancias?.cs||"";const an=c.a?c.a.split(" ")[0]:"";
-    return[c.n,c.m,an,gs||"",gd.envDJ||"",gd.anticipos||"",gd.montoAnticipo?parseFloat(gd.montoAnticipo):"",gd.saldoFavor||"",gd.montoSAF?parseFloat(gd.montoSAF):"",gd.quebrantos?parseFloat(gd.quebrantos):""];
+    return[c.n,c.m,an,gs||"",gd.envDJ||"",gd.anticipos||"",gd.montoAnticipo?parseFloat(gd.montoAnticipo):"",gd.saldoFavor||"",gd.montoSAF?parseFloat(gd.montoSAF):"",gd.quebranto||"",gd.quebrantos?parseFloat(gd.quebrantos):""];
   });
   const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
-  ws["!cols"]=[{wch:32},{wch:8},{wch:14},{wch:14},{wch:10},{wch:12},{wch:18},{wch:14},{wch:18},{wch:18}];
+  ws["!cols"]=[{wch:32},{wch:8},{wch:14},{wch:14},{wch:10},{wch:12},{wch:18},{wch:14},{wch:18},{wch:12},{wch:18}];
   XLSX.utils.book_append_sheet(wb,ws,"Detalle Ganancias");
   XLSX.writeFile(wb,"detalle_ganancias_"+yr+".xlsx");
 }
