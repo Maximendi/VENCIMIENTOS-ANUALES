@@ -430,7 +430,7 @@ return '<div style="display:flex;justify-content:space-between;align-items:flex-
 function vDetG(){
 const doneG=S.clients.filter(c=>c.o?.ganancias?.cs==="PRESENTADA"||c.o?.ganancias?.cs==="N/C").length;
 return '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:6px"><div><h2 class="stitle" style="margin-bottom:4px">Detalle Ganancias · '+S.years.cur+'</h2><p style="font-size:12px;color:var(--text-muted);margin:0">Estado detallado de DJ Ganancias por sociedad. Los cambios se graban automáticamente.</p></div><span style="font-size:12px;color:var(--text-muted);font-weight:500;padding-top:4px">'+doneG+' presentadas · '+S.clients.length+' clientes</span></div>'+
-'<div style="display:flex;gap:20px;margin-bottom:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--gray-border)"><span style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px"><span class="sym sym-p" style="font-size:13px">✓</span> SI</span><span style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px"><span style="color:#DC2626;font-size:17px;font-weight:900;line-height:1">✗</span> NO</span><span style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px"><span class="sym-nd">—</span> Sin dato</span></div>'+
+'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;padding:8px 0;border-bottom:1px solid var(--gray-border)"><div style="display:flex;gap:20px;flex-wrap:wrap"><span style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px"><span class="sym sym-p" style="font-size:13px">✓</span> SI</span><span style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px"><span style="color:#DC2626;font-size:17px;font-weight:900;line-height:1">✗</span> NO</span><span style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px"><span class="sym-nd">—</span> Sin dato</span></div><div style="display:flex;gap:8px"><button class="btn-s" onclick="exportDetGPDF()" title="Exportar a PDF">⬇ PDF</button><button class="btn-s" onclick="exportDetGXLSX()" title="Exportar a Excel">⬇ Excel</button></div></div>'+
 '<div class="scroll-obl"><table><thead><tr>'+
 '<th style="min-width:160px">Cliente</th>'+
 '<th style="text-align:center">Cierre</th>'+
@@ -622,6 +622,48 @@ function exportWfXLSX(){
   ws["!cols"]=[{wch:30},{wch:8},{wch:14},{wch:14},...WFSTEPS.map(()=>({wch:16})),{wch:18},{wch:18},{wch:12}];
   XLSX.utils.book_append_sheet(wb,ws,"Workflow Ganancias");
   XLSX.writeFile(wb,"workflow_ganancias_"+yr+".xlsx");
+}
+
+/* ── Det. Ganancias → PDF ── */
+function exportDetGPDF(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:"landscape",unit:"pt",format:"a4"});
+  const yr=S.years.cur;
+  doc.setFontSize(13);doc.setTextColor(26,95,173);
+  doc.text("San Miguel Contadores — Detalle Ganancias ("+yr+")",40,36);
+  doc.setFontSize(8);doc.setTextColor(120,120,120);
+  doc.text("Generado: "+fmtD(TODAY),40,50);
+  const head=[["Cliente","Cierre","Analista","Ganancias","Envío DJ","Anticipos","Monto Anticipos","Saldo a Favor","Monto SAF","Quebrantos acum."]];
+  const body=S.clients.map(c=>{
+    const gd=c.gd||{};const gs=c.o?.ganancias?.cs||"";const an=c.a?c.a.split(" ")[0]:"—";
+    return[c.n,c.m,an,gs||"—",gd.envDJ||"—",gd.anticipos||"—",gd.montoAnticipo?fmtMonto(gd.montoAnticipo):"—",gd.saldoFavor||"—",gd.montoSAF?fmtMonto(gd.montoSAF):"—",gd.quebrantos?fmtMonto(gd.quebrantos):"—"];
+  });
+  const stColor=v=>v==="PRESENTADA"||v==="SI"?[22,128,60]:v==="ADEUDADA"||v==="NO"?[185,28,28]:v==="N/C"?[109,40,217]:[150,150,150];
+  doc.autoTable({
+    head,body,startY:62,
+    styles:{fontSize:7.5,cellPadding:4,font:"helvetica",overflow:"ellipsize"},
+    headStyles:{fillColor:[26,95,173],textColor:[255,255,255],fontStyle:"bold"},
+    columnStyles:{0:{cellWidth:110},1:{cellWidth:30,halign:"center"},2:{cellWidth:44,halign:"center"},3:{cellWidth:60,halign:"center"},4:{cellWidth:44,halign:"center"},5:{cellWidth:44,halign:"center"},6:{cellWidth:72,halign:"right"},7:{cellWidth:50,halign:"center"},8:{cellWidth:72,halign:"right"},9:{cellWidth:80,halign:"right"}},
+    didParseCell:function(data){if(data.section==="body"&&[3,4,5,7].includes(data.column.index)){data.cell.styles.textColor=stColor(data.cell.raw);data.cell.styles.fontStyle="bold";}},
+    alternateRowStyles:{fillColor:[246,248,252]},
+    margin:{left:40,right:40}
+  });
+  doc.save("detalle_ganancias_"+yr+".pdf");
+}
+
+/* ── Det. Ganancias → Excel ── */
+function exportDetGXLSX(){
+  const yr=S.years.cur;
+  const wb=XLSX.utils.book_new();
+  const header=["Cliente","Cierre","Analista","Ganancias","Envío DJ","Anticipos","Monto Anticipos","Saldo a Favor","Monto SAF","Quebrantos acum."];
+  const rows=S.clients.map(c=>{
+    const gd=c.gd||{};const gs=c.o?.ganancias?.cs||"";const an=c.a?c.a.split(" ")[0]:"";
+    return[c.n,c.m,an,gs||"",gd.envDJ||"",gd.anticipos||"",gd.montoAnticipo?parseFloat(gd.montoAnticipo):"",gd.saldoFavor||"",gd.montoSAF?parseFloat(gd.montoSAF):"",gd.quebrantos?parseFloat(gd.quebrantos):""];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
+  ws["!cols"]=[{wch:32},{wch:8},{wch:14},{wch:14},{wch:10},{wch:12},{wch:18},{wch:14},{wch:18},{wch:18}];
+  XLSX.utils.book_append_sheet(wb,ws,"Detalle Ganancias");
+  XLSX.writeFile(wb,"detalle_ganancias_"+yr+".xlsx");
 }
 
 function resetToLatest(){
