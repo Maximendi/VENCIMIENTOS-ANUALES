@@ -229,7 +229,7 @@ const INIT_DATA=[{"id":1,"n":"AC SERVICIOS SAU","a":"YANINA ALARCON","c":8,"m":1
 /* ─── State ─── */
 let S={clients:null,years:{"cur":2025,"hist":[2024,2023,2022,2021]},view:"dashboard",selId:null,filtA:"",filtS:"",search:"",oblF:"ganancias",oblSearch:"",dashFilt:"",dashObl:""};
 function load(){try{const d=JSON.parse(localStorage.getItem("smca_v2"));if(d){S.clients=d.clients;S.years=d.years||S.years}}catch(e){}if(!S.clients)S.clients=JSON.parse(JSON.stringify(INIT_DATA));migrateWfDates()}
-function migrateWfDates(){S.clients.forEach(c=>{if(c.o&&c.o.ganancias){if(!Array.isArray(c.o.ganancias.wfDates))c.o.ganancias.wfDates=["","","","","","","","",""];while(c.o.ganancias.wfDates.length<9)c.o.ganancias.wfDates.push("");if(!Array.isArray(c.o.ganancias.wf))c.o.ganancias.wf=["","","","","","","","",""];while(c.o.ganancias.wf.length<9)c.o.ganancias.wf.push("")}if(!c.gd)c.gd={envDJ:"",anticipos:"",montoAnticipo:"",saldoFavor:"",montoSAF:""}})}
+function migrateWfDates(){S.clients.forEach(c=>{if(c.o&&c.o.ganancias){if(!Array.isArray(c.o.ganancias.wfDates))c.o.ganancias.wfDates=["","","","","","","","",""];while(c.o.ganancias.wfDates.length<9)c.o.ganancias.wfDates.push("");if(!Array.isArray(c.o.ganancias.wf))c.o.ganancias.wf=["","","","","","","","",""];while(c.o.ganancias.wf.length<9)c.o.ganancias.wf.push("")}if(!c.gd)c.gd={envDJ:"",anticipos:"",montoAnticipo:"",saldoFavor:"",montoSAF:"",quebrantos:""};else if(c.gd.quebrantos===undefined)c.gd.quebrantos=""})}
 function persist(){try{localStorage.setItem("smca_v2",JSON.stringify({clients:S.clients,years:S.years}))}catch(e){}}
 
 /* ─── Render ─── */
@@ -441,6 +441,7 @@ return '<div style="display:flex;justify-content:space-between;align-items:flex-
 '<th style="text-align:center;min-width:110px">Monto Anticipos</th>'+
 '<th style="text-align:center;min-width:90px">Saldo a Favor</th>'+
 '<th style="text-align:center;min-width:110px">Monto SAF</th>'+
+'<th style="text-align:center;min-width:120px">Quebrantos acum.</th>'+
 '</tr></thead><tbody>'+
 S.clients.map(c=>{const gd=c.gd||{};const gs=c.o?.ganancias?.cs||"";return'<tr>'+
 '<td class="trunc" style="font-weight:600;cursor:pointer" onclick="goDetail('+c.id+')">'+c.n+'</td>'+
@@ -452,6 +453,7 @@ S.clients.map(c=>{const gd=c.gd||{};const gs=c.o?.ganancias?.cs||"";return'<tr>'
 '<td style="text-align:center;padding:3px 6px">'+montoInput(gd.montoAnticipo||"",c.id,"montoAnticipo")+'</td>'+
 '<td style="text-align:center">'+sinoDiv(gd.saldoFavor||"",c.id,"saldoFavor")+'</td>'+
 '<td style="text-align:center;padding:3px 6px">'+montoInput(gd.montoSAF||"",c.id,"montoSAF")+'</td>'+
+'<td style="text-align:center;padding:3px 6px">'+montoInput(gd.quebrantos||"",c.id,"quebrantos")+'</td>'+
 '</tr>';}).join("")+
 '</tbody></table></div>';}
 
