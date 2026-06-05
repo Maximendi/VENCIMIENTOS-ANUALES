@@ -229,7 +229,7 @@ const INIT_DATA=[{"id":1,"n":"AC SERVICIOS SAU","a":"YANINA ALARCON","c":8,"m":1
 /* ─── State ─── */
 let S={clients:null,years:{"cur":2025,"hist":[2024,2023,2022,2021]},view:"dashboard",selId:null,filtA:"",filtS:"",search:"",oblF:"ganancias",oblSearch:"",dashFilt:"",dashObl:""};
 function load(){try{const d=JSON.parse(localStorage.getItem("smca_v2"));if(d){S.clients=d.clients;S.years=d.years||S.years}}catch(e){}if(!S.clients)S.clients=JSON.parse(JSON.stringify(INIT_DATA));migrateWfDates()}
-function migrateWfDates(){S.clients.forEach(c=>{if(c.o&&c.o.ganancias){if(!Array.isArray(c.o.ganancias.wfDates))c.o.ganancias.wfDates=["","","","","","","","",""];while(c.o.ganancias.wfDates.length<9)c.o.ganancias.wfDates.push("");if(!Array.isArray(c.o.ganancias.wf))c.o.ganancias.wf=["","","","","","","","",""];while(c.o.ganancias.wf.length<9)c.o.ganancias.wf.push("")}})}
+function migrateWfDates(){S.clients.forEach(c=>{if(c.o&&c.o.ganancias){if(!Array.isArray(c.o.ganancias.wfDates))c.o.ganancias.wfDates=["","","","","","","","",""];while(c.o.ganancias.wfDates.length<9)c.o.ganancias.wfDates.push("");if(!Array.isArray(c.o.ganancias.wf))c.o.ganancias.wf=["","","","","","","","",""];while(c.o.ganancias.wf.length<9)c.o.ganancias.wf.push("")}if(!c.gd)c.gd={envDJ:"",anticipos:"",montoAnticipo:"",saldoFavor:"",montoSAF:""}})}
 function persist(){try{localStorage.setItem("smca_v2",JSON.stringify({clients:S.clients,years:S.years}))}catch(e){}}
 
 /* ─── Render ─── */
@@ -257,13 +257,14 @@ function render(){
   else if(S.view==="vencimientos")m.innerHTML=rdMsg+vVto();
   else if(S.view==="workflow")m.innerHTML=rdMsg+vWf();
   else if(S.view==="analistas")m.innerHTML=rdMsg+vAn();
+  else if(S.view==="detganancias")m.innerHTML=rdMsg+vDetG();
   /* restore scroll positions after DOM rebuild */
   requestAnimationFrame(()=>{
     window.scrollTo(0,sy);
     ['.scroll-obl','.scroll-h','.scroll-tbl'].forEach(s=>{if(sc[s]){const e=document.querySelector(s);if(e){e.scrollTop=sc[s].t;e.scrollLeft=sc[s].l;}}});
   });
 }
-function renderNav(){const tabs=[["dashboard","Dashboard"],["clientes","Clientes"],["obligacion","Obligación"],["vencimientos","Vencimientos"],["workflow","Workflow"],["analistas","Analistas"]];document.getElementById("nav").innerHTML=tabs.map(([k,l])=>'<button class="'+(S.view===k||(S.view==="detail"&&k==="clientes")?"active":"")+'" onclick="go(\''+k+'\')">'+l+'</button>').join("")}
+function renderNav(){const tabs=[["dashboard","Dashboard"],["clientes","Clientes"],["obligacion","Obligación"],["vencimientos","Vencimientos"],["workflow","Workflow"],["analistas","Analistas"],["detganancias","Det. Ganancias"]];document.getElementById("nav").innerHTML=tabs.map(([k,l])=>'<button class="'+(S.view===k||(S.view==="detail"&&k==="clientes")?"active":"")+'" onclick="go(\''+k+'\')">'+l+'</button>').join("")}
 function go(v){if(S.view==="detail"&&pendingChanges&&!confirm("Hay cambios pendientes. ¿Confirmar y salir?"))return;pendingChanges=false;S.view=v;render()}
 function goBack(){if(S.view==="detail"&&pendingChanges&&!confirm("Hay cambios pendientes. ¿Confirmar y salir?"))return;pendingChanges=false;S.view="clientes";render();}
 function goDetail(id){S.selId=id;S.view="detail";render()}
@@ -293,6 +294,8 @@ function cUpdWf(cid,i,v){if(!isAdmin)return;if(S.view==="detail"){updWf(cid,i,v)
 function cNextWf(cid,i){if(!isAdmin)return;const c=S.clients.find(x=>x.id===cid);if(!c?.o?.ganancias)return;const cur=c.o.ganancias.wf?.[i]||"";const idx=WFST.indexOf(cur);cUpdWf(cid,i,WFST[(idx+1)%WFST.length]);}
 function cNextObl(cid,ok){if(!isAdmin)return;const c=S.clients.find(x=>x.id===cid);if(!c?.o?.[ok])return;const cur=c.o[ok].cs||"";const idx=STATS.indexOf(cur);cUpdO(cid,ok,'cs',STATS[(idx+1)%STATS.length],'status');}
 function cNextOblH(cid,ok,yr){if(!isAdmin)return;const c=S.clients.find(x=>x.id===cid);if(!c?.o?.[ok])return;const cur=c.o[ok].y?.[yr]||"";const idx=STATS.indexOf(cur);cUpdH(cid,ok,yr,STATS[(idx+1)%STATS.length]);}
+function updGd(cid,f,v){const c=S.clients.find(x=>x.id===cid);if(c){if(!c.gd)c.gd={};c.gd[f]=v;persist();}}
+function toggleGd(cid,f){if(!isAdmin)return;const c=S.clients.find(x=>x.id===cid);if(!c)return;if(!c.gd)c.gd={};const cyc=["","SI","NO"];const cur=c.gd[f]||"";c.gd[f]=cyc[(cyc.indexOf(cur)+1)%cyc.length];persist();render();}
 function cUpdNote(cid,ok,el){if(!isAdmin)return;if(S.view==="detail"){updO(cid,ok,"nt",el.value);pendingChanges=true}else{confirmAndRun("¿Guardar nota?",()=>updO(cid,ok,"nt",el.value))}}
 function cToggleNC(cid,ok,toNC){if(!isAdmin)return;if(S.view==="detail"){updO(cid,ok,"d",toNC?"N/C":"");pendingChanges=true}else{confirmAndRun(toNC?"¿Marcar como N/C?":"¿Habilitar fecha?",()=>updO(cid,ok,"d",toNC?"N/C":""))}}
 
@@ -354,6 +357,8 @@ function openYrCfg(){if(!isAdmin)return;openModal('<h3 style="color:#185FA5">Con
 
 /* ─── HTML builders ─── */
 function oblSymDiv(sym,val,onclick){return '<div onclick="'+onclick+'" title="Clic para cambiar" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:28px;border-radius:5px;background:'+(val==="PRESENTADA"?"#d4edda":val==="ADEUDADA"?"#f8d7da":val==="N/C"?"#EDE9FE":"#F8FAFC")+';border:1px solid '+(val==="PRESENTADA"?"#A7F3D0":val==="ADEUDADA"?"#FCA5A5":val==="N/C"?"#C4B5FD":"#E2E8F0")+'">'+sym+'</div>';}
+function sinoDiv(v,cid,f){const bg=v==="SI"?"#d4edda":v==="NO"?"#f8d7da":"#F8FAFC";const bd=v==="SI"?"#A7F3D0":v==="NO"?"#FCA5A5":"#E2E8F0";const sym=v==="SI"?'<span class="sym sym-p" style="font-size:13px">✓</span>':v==="NO"?'<span style="color:#DC2626;font-size:17px;font-weight:900;line-height:1">✗</span>':'<span class="sym-nd">—</span>';if(!isAdmin)return sym;return'<div onclick="toggleGd('+cid+',\''+f+'\')" title="Clic para cambiar" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:28px;border-radius:5px;background:'+bg+';border:1px solid '+bd+'">'+sym+'</div>';}
+function montoInput(v,cid,f){if(!isAdmin)return v?'<span style="font-size:11px;font-weight:600;color:#185FA5">$'+Number(v).toLocaleString("es-AR")+'</span>':'<span class="sym-nd">—</span>';return'<input type="number" value="'+(v||"")+'" placeholder="0" min="0" style="width:90px;font-size:11px;padding:4px 6px;border:1px solid #CBD5E1;border-radius:4px;text-align:right;font-family:Inter,sans-serif" onchange="updGd('+cid+',\''+f+'\',this.value)">';}
 function stSel(cid,ok,val){if(!isAdmin)return symF(val);return oblSymDiv(symF(val),val,"cNextObl("+cid+",'"+ok+"')");}
 function stSelH(cid,ok,yr,val){if(!isAdmin)return symF(val||"");return oblSymDiv(symF(val||""),val||"","cNextOblH("+cid+",'"+ok+"',"+yr+")");}
 
@@ -419,6 +424,34 @@ const WFH=["AxI Estático","Pagos Cta.","Bce. Prel.","Anál. Bal.","AxI Dinámic
 const doneWf=S.clients.filter(c=>{const wf=c.o.ganancias?.wf||[];return wf.filter(s=>s==="TERMINADO"||s==="NO VENCE").length===9}).length;
 return '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:6px"><div><h2 class="stitle" style="margin-bottom:4px">Workflow · DJ Ganancias · '+S.years.cur+'</h2><p style="font-size:12px;color:var(--text-muted);margin:0">Seguimiento de los 9 pasos de preparación de la DJ por cliente.</p></div><span style="font-size:12px;color:var(--text-muted);font-weight:500;padding-top:4px">'+doneWf+' completos · '+S.clients.length+' clientes</span></div><div class="filter-bar" style="margin-bottom:0"><div class="ml-auto" style="display:flex;gap:8px"><button class="btn-s" onclick="exportWfPDF()" title="Exportar Workflow a PDF">⬇ PDF</button><button class="btn-s" onclick="exportWfXLSX()" title="Exportar Workflow a Excel">⬇ Excel</button></div></div>'+WFLEG+'<div class="scroll-h"><table><colgroup><col style="width:110px"><col style="width:26px"><col style="width:56px"><col style="width:50px">'+WFW.map(w=>'<col style="width:'+w+'px">').join("")+'<col style="width:34px"></colgroup><thead><tr><th style="text-align:left;padding:8px">Cliente</th><th style="text-align:center;padding:8px 4px" title="Mes de cierre">Cie.</th><th style="text-align:center;padding:8px 4px" title="Vencimiento DJ Ganancias">Vto.</th><th style="text-align:center;padding:8px 4px" title="Analista a cargo">Asist.</th>'+WFH.map((h,i)=>'<th style="font-size:9px;text-align:center;white-space:normal;line-height:1.25;padding:6px 3px;vertical-align:middle" title="'+WFSTEPS[i]+'">'+(i+1)+'. '+h+((i===2||i===6)?'<br><span style="font-weight:400;color:#999;font-size:8px;letter-spacing:0;text-transform:none">(+fecha)</span>':"")+'</th>').join("")+'<th style="text-align:center;padding:8px 4px">%</th></tr></thead><tbody>'+S.clients.map(c=>{const wf=c.o.ganancias?.wf||[];const wfd=c.o.ganancias?.wfDates||[];const dn=wf.filter(s=>s==="TERMINADO"||s==="NO VENCE").length;const pc=Math.round(dn/9*100);const gd=c.o.ganancias?.d||"";const dT=daysTo(gd);return'<tr><td style="font-weight:600;font-size:10px;padding:4px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="goDetail('+c.id+')">'+c.n+'</td><td style="text-align:center;font-size:10px;padding:4px 2px">'+c.m+'</td><td style="text-align:center;font-size:10px;padding:4px 2px;white-space:nowrap;color:'+(gd&&gd!=="N/C"?(dT<0?"#721c24":dT<=30?"#854F0B":"#555"):"#888")+';font-weight:600">'+(gd?fmtD(gd):"—")+'</td><td style="text-align:center;font-size:10px;padding:4px 2px;color:#555">'+(c.a?c.a.split(" ")[0]:"—")+'</td>'+WFSTEPS.map((stepName,i)=>{const sel=isAdmin?'<div onclick="cNextWf('+c.id+','+i+')" title="Clic para cambiar" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:28px;border-radius:5px;background:'+(wf[i]==="TERMINADO"?"#d4edda":wf[i]==="EN PROCESO"?"#FFF8EC":wf[i]==="NO VENCE"?"#DDD6FE":"#F8FAFC")+';border:1px solid '+(wf[i]==="TERMINADO"?"#A7F3D0":wf[i]==="EN PROCESO"?"#FDE68A":wf[i]==="NO VENCE"?"#C4B5FD":"#E2E8F0")+'">'+wfSymF(wf[i]||"")+'</div>':badge(wf[i]);let dateField="";if(i===2||i===6){const disp=dateToDisplay(wfd[i]||"");if(isAdmin){dateField='<input type="text" placeholder="DD/MM/AAAA" value="'+disp+'" maxlength="10" style="font-size:8px;padding:2px 3px;width:100%;box-sizing:border-box;margin-top:2px;text-align:center;border:1px solid #ccc;border-radius:4px;font-family:Inter,sans-serif;background:#FAFAFA" oninput="handleDateInput(this,'+c.id+',\'ganancias\')" onblur="handleWfDateBlur(this,'+c.id+','+i+',\''+stepName+'\')">';}else{dateField=disp?'<div style="font-size:8px;color:#555;margin-top:2px;text-align:center">'+disp+'</div>':'<div style="font-size:8px;color:#bbb;margin-top:2px;text-align:center">—</div>';}}return'<td style="text-align:center;padding:3px 2px;vertical-align:top;overflow:hidden">'+sel+dateField+'</td>'}).join("")+'<td style="text-align:center;padding:4px 2px"><span style="font-size:10px;font-weight:600;color:'+(pc===100?"#155724":"#854F0B")+'">'+pc+'%</span></td></tr>'}).join("")+'</tbody></table></div>'
 }
+
+function vDetG(){
+const doneG=S.clients.filter(c=>c.o?.ganancias?.cs==="PRESENTADA"||c.o?.ganancias?.cs==="N/C").length;
+return '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:6px"><div><h2 class="stitle" style="margin-bottom:4px">Detalle Ganancias · '+S.years.cur+'</h2><p style="font-size:12px;color:var(--text-muted);margin:0">Estado detallado de DJ Ganancias por sociedad. Los cambios se graban automáticamente.</p></div><span style="font-size:12px;color:var(--text-muted);font-weight:500;padding-top:4px">'+doneG+' presentadas · '+S.clients.length+' clientes</span></div>'+
+'<div style="display:flex;gap:20px;margin-bottom:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--gray-border)"><span style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px"><span class="sym sym-p" style="font-size:13px">✓</span> SI</span><span style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px"><span style="color:#DC2626;font-size:17px;font-weight:900;line-height:1">✗</span> NO</span><span style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px"><span class="sym-nd">—</span> Sin dato</span></div>'+
+'<div class="scroll-obl"><table><thead><tr>'+
+'<th style="min-width:160px">Cliente</th>'+
+'<th style="text-align:center">Cierre</th>'+
+'<th style="text-align:center">Analista</th>'+
+'<th style="text-align:center;min-width:80px">Ganancias</th>'+
+'<th style="text-align:center;min-width:80px">Envío DJ</th>'+
+'<th style="text-align:center;min-width:80px">Anticipos</th>'+
+'<th style="text-align:center;min-width:110px">Monto Anticipos</th>'+
+'<th style="text-align:center;min-width:90px">Saldo a Favor</th>'+
+'<th style="text-align:center;min-width:110px">Monto SAF</th>'+
+'</tr></thead><tbody>'+
+S.clients.map(c=>{const gd=c.gd||{};const gs=c.o?.ganancias?.cs||"";return'<tr>'+
+'<td class="trunc" style="font-weight:600;cursor:pointer" onclick="goDetail('+c.id+')">'+c.n+'</td>'+
+'<td style="text-align:center;font-size:11px">'+c.m+'</td>'+
+'<td style="text-align:center;font-size:11px;color:var(--text-muted)">'+c.a.split(" ")[0]+'</td>'+
+'<td style="text-align:center">'+(isAdmin?oblSymDiv(symF(gs),gs,"cNextObl("+c.id+",'ganancias')"):symF(gs))+'</td>'+
+'<td style="text-align:center">'+sinoDiv(gd.envDJ||"",c.id,"envDJ")+'</td>'+
+'<td style="text-align:center">'+sinoDiv(gd.anticipos||"",c.id,"anticipos")+'</td>'+
+'<td style="text-align:center;padding:3px 6px">'+montoInput(gd.montoAnticipo||"",c.id,"montoAnticipo")+'</td>'+
+'<td style="text-align:center">'+sinoDiv(gd.saldoFavor||"",c.id,"saldoFavor")+'</td>'+
+'<td style="text-align:center;padding:3px 6px">'+montoInput(gd.montoSAF||"",c.id,"montoSAF")+'</td>'+
+'</tr>';}).join("")+
+'</tbody></table></div>';}
 
 function vAn(){return '<h2 class="stitle">Vista por Analista</h2>'+ANALYSTS.map(a=>{const cs=S.clients.filter(c=>c.a===a);const ad=cs.reduce((ac,c)=>ac+OBLS.filter(k=>c.o[k]?.cs==="ADEUDADA").length,0);const pr=cs.reduce((ac,c)=>ac+OBLS.filter(k=>c.o[k]?.cs==="PRESENTADA").length,0);const pd=cs.reduce((ac,c)=>ac+OBLS.filter(k=>!c.o[k]?.cs).length,0);return'<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h4 style="margin:0;font-size:14px;color:#185FA5">'+a+'</h4><span style="font-size:12px;color:#555">'+cs.length+' clientes</span></div><div style="display:flex;gap:10px;margin-bottom:10px"><span style="font-size:12px"><b style="color:#155724">'+pr+'</b> pres.</span><span style="font-size:12px"><b style="color:#721c24">'+ad+'</b> adeud.</span><span style="font-size:12px"><b style="color:#854F0B">'+pd+'</b> s/dato</span></div><div><table><thead><tr><th style="font-size:10px">Cliente</th>'+OBLS.map(k=>'<th style="font-size:9px;text-align:center">'+OLBL[k].split(" ")[0]+'</th>').join("")+'</tr></thead><tbody>'+cs.map(c=>'<tr class="clickable" onclick="goDetail('+c.id+')"><td style="font-size:11px;font-weight:600">'+c.n+'</td>'+OBLS.map(k=>'<td style="text-align:center">'+symF(c.o[k]?.cs)+'</td>').join("")+'</tr>').join("")+'</tbody></table></div></div>'}).join("")}
 
