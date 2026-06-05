@@ -663,9 +663,21 @@ function exportDetGPDF(){
   };
   doc.autoTable({
     head,body,startY:62,
-    styles:{fontSize:7.5,cellPadding:4,font:"helvetica",overflow:"ellipsize"},
-    headStyles:{fillColor:[26,95,173],textColor:[255,255,255],fontStyle:"bold",fontSize:7},
-    columnStyles:{0:{cellWidth:130},1:{cellWidth:26,halign:"center"},2:{cellWidth:46,halign:"center"},3:{cellWidth:46,halign:"center"},4:{cellWidth:40,halign:"center"},5:{cellWidth:40,halign:"center"},6:{cellWidth:72,halign:"right"},7:{cellWidth:46,halign:"center"},8:{cellWidth:72,halign:"right"},9:{cellWidth:40,halign:"center"},10:{cellWidth:76,halign:"right"}},
+    styles:{fontSize:7.5,cellPadding:3,font:"helvetica",overflow:"ellipsize"},
+    headStyles:{fillColor:[26,95,173],textColor:[255,255,255],fontStyle:"bold",fontSize:7,overflow:"linebreak",cellPadding:3,minCellHeight:20,valign:"middle"},
+    columnStyles:{
+      0:{cellWidth:132},
+      1:{cellWidth:36,halign:"center"},
+      2:{cellWidth:48,halign:"center"},
+      3:{cellWidth:52,halign:"center"},
+      4:{cellWidth:44,halign:"center"},
+      5:{cellWidth:46,halign:"center"},
+      6:{cellWidth:74,halign:"right"},
+      7:{cellWidth:58,halign:"center"},
+      8:{cellWidth:70,halign:"right"},
+      9:{cellWidth:52,halign:"center"},
+      10:{cellWidth:82,halign:"right"}
+    },
     didParseCell:function(data){
       if(data.section==="body"&&ICON_COLS.includes(data.column.index))data.cell.text=[""];
     },
