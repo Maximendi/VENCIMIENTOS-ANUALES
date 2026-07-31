@@ -303,18 +303,23 @@ function cToggleNC(cid,ok,toNC){if(!isAdmin)return;if(S.view==="detail"){updO(ci
 function addClient(){if(!isAdmin)return;const n=document.getElementById("add-n").value;if(!n)return;if(!confirm("¿Agregar cliente "+n+"?"))return;const c={id:Math.max(...S.clients.map(x=>x.id),0)+1,n,a:document.getElementById("add-a").value,c:parseInt(document.getElementById("add-c").value)||0,m:parseInt(document.getElementById("add-m").value)||12,ib:document.getElementById("add-ib").value,o:nO(S.years.hist)};S.clients.push(c);persist();closeModal();render()}
 function delClient(id){if(!isAdmin)return;const c=S.clients.find(x=>x.id===id);if(!confirm("¿Eliminar a "+c.n+"? No se puede deshacer."))return;S.clients=S.clients.filter(x=>x.id!==id);if(S.selId===id){S.selId=null;S.view="clientes"}persist();closeModal();render()}
 function saveYears(){if(!isAdmin)return;if(!confirm("¿Guardar configuración de años?"))return;S.years.cur=parseInt(document.getElementById("yr-cur").value)||2025;S.years.hist=[0,1,2,3].map(i=>parseInt(document.getElementById("yr-h"+i).value)||2020);persist();closeModal();render()}
+/* ── File System Access API helpers (persiste el handle en IndexedDB) ── */
+function _idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open("smca_fs",1);r.onupgradeneeded=e=>e.target.result.createObjectStore("h");r.onsuccess=e=>res(e.target.result);r.onerror=()=>rej(r.error);})}
+async function _getExportDir(){try{const db=await _idbOpen();return new Promise(res=>{const tx=db.transaction("h","readonly");const g=tx.objectStore("h").get("exportDir");g.onsuccess=()=>res(g.result||null);g.onerror=()=>res(null);})}catch{return null}}
+async function _saveExportDir(h){try{const db=await _idbOpen();return new Promise(res=>{const tx=db.transaction("h","readwrite");tx.objectStore("h").put(h,"exportDir");tx.oncomplete=res;})}catch{}}
+async function _verifyPerm(h){try{if((await h.queryPermission({mode:"readwrite"})==="granted"))return true;return(await h.requestPermission({mode:"readwrite"})==="granted")}catch{return false}}
+async function resetExportDir(){await _saveExportDir(null);alert("Carpeta de exportación reiniciada. La próxima exportación te pedirá elegir carpeta.")}
+
 async function exportHtml(){
   if(!isAdmin)return;
-  if(!confirm("¿Exportar HTML con los datos actuales?\n\nSe descargará un archivo index.html que deberás subir a GitHub para que el resto del equipo vea los cambios."))return;
+  if(!confirm("¿Exportar HTML con los datos actuales?\n\nSe guardará index.html con los datos embebidos."))return;
   try{
     const resp=await fetch(window.location.href);
     if(!resp.ok)throw new Error("HTTP "+resp.status);
     let html=await resp.text();
-    // Reemplazar INIT_DATA usando marcadores de texto fijos
     const startMarker="const INIT_DATA=";
     const startIdx=html.indexOf(startMarker);
     if(startIdx===-1)throw new Error("No se encontró INIT_DATA en el HTML fuente");
-    // Encontrar el cierre: buscar "];" desde el inicio del array
     const arrayStart=startIdx+startMarker.length;
     let depth=0,endIdx=-1;
     for(let i=arrayStart;i<html.length;i++){
@@ -323,11 +328,9 @@ async function exportHtml(){
     }
     if(endIdx===-1)throw new Error("No se pudo encontrar el cierre de INIT_DATA");
     html=html.slice(0,startIdx)+startMarker+JSON.stringify(S.clients)+";"+html.slice(endIdx+2);
-    // Reemplazar years: buscar dentro del bloque State que ya fue actualizado
     const yearsToken="\"cur\":";
     const yti=html.indexOf(yearsToken,startIdx);
     if(yti!==-1){
-      // retroceder hasta encontrar "years:"
       let ysi=html.lastIndexOf("years:",yti);
       if(ysi!==-1){
         const yStart=ysi+"years:".length;
@@ -340,11 +343,34 @@ async function exportHtml(){
       }
     }
     const blob=new Blob([html],{type:"text/html;charset=utf-8"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");
-    a.href=url;a.download="index.html";document.body.appendChild(a);a.click();document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setTimeout(()=>alert("Archivo descargado.\n\nPróximos pasos:\n1. Ir a github.com/Maximendi/VENCIMIENTOS-ANUALES\n2. Click en index.html\n3. Click en el lápiz (editar)\n4. Borrar todo el contenido y pegar el nuevo\n5. Commit changes\n6. Esperar 2 minutos"),100);
+    /* ── Intentar guardar directo en carpeta predeterminada ── */
+    if(window.showDirectoryPicker){
+      let dirHandle=await _getExportDir();
+      let isNew=false;
+      if(!dirHandle||(!(await _verifyPerm(dirHandle)))){
+        try{
+          dirHandle=await window.showDirectoryPicker({mode:"readwrite",startIn:"documents"});
+          await _saveExportDir(dirHandle);
+          isNew=true;
+        }catch(e){if(e.name==="AbortError")return;throw e;}
+      }
+      if(!(await _verifyPerm(dirHandle))){throw new Error("Sin permiso de escritura en la carpeta.");}
+      const fh=await dirHandle.getFileHandle("index.html",{create:true});
+      const wr=await fh.createWritable();
+      await wr.write(blob);
+      await wr.close();
+      const msg=isNew
+        ?"✅ Carpeta guardada como predeterminada.\nArchivo index.html exportado correctamente.\n\nPróximas exportaciones irán directo a esta carpeta."
+        :"✅ index.html exportado a la carpeta predeterminada.\n\nPróximos pasos:\n1. Ir a github.com/Maximendi/VENCIMIENTOS-ANUALES\n2. Click en index.html → lápiz (editar)\n3. Borrar todo y pegar el nuevo contenido\n4. Commit changes";
+      setTimeout(()=>alert(msg),100);
+    } else {
+      /* ── Fallback: descarga normal (Safari / Firefox) ── */
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url;a.download="index.html";document.body.appendChild(a);a.click();document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setTimeout(()=>alert("Archivo descargado.\n\nNota: tu navegador no soporta guardar en carpeta predeterminada.\nUsá Chrome para activar esa función.\n\nPróximos pasos:\n1. Ir a github.com/Maximendi/VENCIMIENTOS-ANUALES\n2. Click en index.html → lápiz (editar)\n3. Borrar todo y pegar el nuevo contenido\n4. Commit changes"),100);
+    }
   }catch(e){
     alert("Error al exportar: "+e.message+"\n\nNota: esta función solo funciona desde el sitio publicado en GitHub Pages, no abriendo el archivo localmente.");
   }
