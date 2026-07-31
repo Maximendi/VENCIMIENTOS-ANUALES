@@ -303,16 +303,29 @@ function cToggleNC(cid,ok,toNC){if(!isAdmin)return;if(S.view==="detail"){updO(ci
 function addClient(){if(!isAdmin)return;const n=document.getElementById("add-n").value;if(!n)return;if(!confirm("¿Agregar cliente "+n+"?"))return;const c={id:Math.max(...S.clients.map(x=>x.id),0)+1,n,a:document.getElementById("add-a").value,c:parseInt(document.getElementById("add-c").value)||0,m:parseInt(document.getElementById("add-m").value)||12,ib:document.getElementById("add-ib").value,o:nO(S.years.hist)};S.clients.push(c);persist();closeModal();render()}
 function delClient(id){if(!isAdmin)return;const c=S.clients.find(x=>x.id===id);if(!confirm("¿Eliminar a "+c.n+"? No se puede deshacer."))return;S.clients=S.clients.filter(x=>x.id!==id);if(S.selId===id){S.selId=null;S.view="clientes"}persist();closeModal();render()}
 function saveYears(){if(!isAdmin)return;if(!confirm("¿Guardar configuración de años?"))return;S.years.cur=parseInt(document.getElementById("yr-cur").value)||2025;S.years.hist=[0,1,2,3].map(i=>parseInt(document.getElementById("yr-h"+i).value)||2020);persist();closeModal();render()}
-/* ── File System Access API helpers (persiste el handle en IndexedDB) ── */
+/* ── File System Access API helpers ── */
+let _exportDirH=null; // cache en memoria; se carga en init()
 function _idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open("smca_fs",1);r.onupgradeneeded=e=>e.target.result.createObjectStore("h");r.onsuccess=e=>res(e.target.result);r.onerror=()=>rej(r.error);})}
 async function _getExportDir(){try{const db=await _idbOpen();return new Promise(res=>{const tx=db.transaction("h","readonly");const g=tx.objectStore("h").get("exportDir");g.onsuccess=()=>res(g.result||null);g.onerror=()=>res(null);})}catch{return null}}
-async function _saveExportDir(h){try{const db=await _idbOpen();return new Promise(res=>{const tx=db.transaction("h","readwrite");tx.objectStore("h").put(h,"exportDir");tx.oncomplete=res;})}catch{}}
-async function _verifyPerm(h){try{if((await h.queryPermission({mode:"readwrite"})==="granted"))return true;return(await h.requestPermission({mode:"readwrite"})==="granted")}catch{return false}}
-async function resetExportDir(){await _saveExportDir(null);alert("Carpeta de exportación reiniciada. La próxima exportación te pedirá elegir carpeta.")}
+async function _saveExportDir(h){try{const db=await _idbOpen();await new Promise(res=>{const tx=db.transaction("h","readwrite");tx.objectStore("h").put(h,"exportDir");tx.oncomplete=res;})}catch{}}
+async function _loadExportDirH(){_exportDirH=await _getExportDir()} // llamado en init()
+async function resetExportDir(){_exportDirH=null;await _saveExportDir(null);alert("Carpeta reiniciada. La próxima exportación te pedirá elegir carpeta.")}
 
 async function exportHtml(){
   if(!isAdmin)return;
   if(!confirm("¿Exportar HTML con los datos actuales?\n\nSe guardará index.html con los datos embebidos."))return;
+  let isNew=false;
+  /* showDirectoryPicker DEBE llamarse ANTES de cualquier await para conservar el user gesture */
+  if(window.showDirectoryPicker&&!_exportDirH){
+    try{
+      _exportDirH=await window.showDirectoryPicker({mode:"readwrite",startIn:"documents"});
+      await _saveExportDir(_exportDirH);
+      isNew=true;
+    }catch(e){
+      if(e.name==="AbortError")return;
+      _exportDirH=null; // caer al fallback de descarga
+    }
+  }
   try{
     const resp=await fetch(window.location.href);
     if(!resp.ok)throw new Error("HTTP "+resp.status);
@@ -343,33 +356,26 @@ async function exportHtml(){
       }
     }
     const blob=new Blob([html],{type:"text/html;charset=utf-8"});
-    /* ── Intentar guardar directo en carpeta predeterminada ── */
-    if(window.showDirectoryPicker){
-      let dirHandle=await _getExportDir();
-      let isNew=false;
-      if(!dirHandle||(!(await _verifyPerm(dirHandle)))){
-        try{
-          dirHandle=await window.showDirectoryPicker({mode:"readwrite",startIn:"documents"});
-          await _saveExportDir(dirHandle);
-          isNew=true;
-        }catch(e){if(e.name==="AbortError")return;throw e;}
-      }
-      if(!(await _verifyPerm(dirHandle))){throw new Error("Sin permiso de escritura en la carpeta.");}
-      const fh=await dirHandle.getFileHandle("index.html",{create:true});
+    if(_exportDirH){
+      /* verificar permiso (puede haberse revocado al reiniciar Chrome) */
+      let ok=false;
+      try{ok=(await _exportDirH.queryPermission({mode:"readwrite"})==="granted")||(await _exportDirH.requestPermission({mode:"readwrite"})==="granted")}catch{}
+      if(!ok){_exportDirH=null;await _saveExportDir(null);throw new Error("Permiso denegado. Hacé clic en 'Exportar HTML' de nuevo para seleccionar la carpeta.");}
+      const fh=await _exportDirH.getFileHandle("index.html",{create:true});
       const wr=await fh.createWritable();
       await wr.write(blob);
       await wr.close();
       const msg=isNew
-        ?"✅ Carpeta guardada como predeterminada.\nArchivo index.html exportado correctamente.\n\nPróximas exportaciones irán directo a esta carpeta."
+        ?"✅ Carpeta guardada como predeterminada.\nindex.html exportado correctamente.\n\nLas próximas exportaciones irán directo a esta carpeta."
         :"✅ index.html exportado a la carpeta predeterminada.\n\nPróximos pasos:\n1. Ir a github.com/Maximendi/VENCIMIENTOS-ANUALES\n2. Click en index.html → lápiz (editar)\n3. Borrar todo y pegar el nuevo contenido\n4. Commit changes";
       setTimeout(()=>alert(msg),100);
-    } else {
-      /* ── Fallback: descarga normal (Safari / Firefox) ── */
+    }else{
+      /* Fallback: descarga normal (sin File System Access API o usuario canceló picker) */
       const url=URL.createObjectURL(blob);
       const a=document.createElement("a");
       a.href=url;a.download="index.html";document.body.appendChild(a);a.click();document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      setTimeout(()=>alert("Archivo descargado.\n\nNota: tu navegador no soporta guardar en carpeta predeterminada.\nUsá Chrome para activar esa función.\n\nPróximos pasos:\n1. Ir a github.com/Maximendi/VENCIMIENTOS-ANUALES\n2. Click en index.html → lápiz (editar)\n3. Borrar todo y pegar el nuevo contenido\n4. Commit changes"),100);
+      setTimeout(()=>alert("Archivo descargado.\n\n"+(window.showDirectoryPicker?"":"Nota: tu navegador no soporta guardar en carpeta predeterminada. Usá Chrome para activar esa función.\n\n")+"Próximos pasos:\n1. Ir a github.com/Maximendi/VENCIMIENTOS-ANUALES\n2. Click en index.html → lápiz (editar)\n3. Borrar todo y pegar el nuevo contenido\n4. Commit changes"),100);
     }
   }catch(e){
     alert("Error al exportar: "+e.message+"\n\nNota: esta función solo funciona desde el sitio publicado en GitHub Pages, no abriendo el archivo localmente.");
@@ -890,7 +896,7 @@ function resetToLatest(){
   localStorage.removeItem("smca_v2");
   location.reload();
 }
-function init(){load();render()}
+function init(){load();render();_loadExportDirH()}
 </script>
 </body>
 </html>
